@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdatomic.h>
 
 typedef struct
 {
@@ -12,6 +13,7 @@ typedef struct
     uint64_t used_blocks;  // 已使用的块数
     int64_t free_next_id; // 首个空闲块的id,if no free block, this is -1;
     void *start; // 指向块内存起始位置
+    _Atomic int64_t lock; // 原子锁，用于多线程同步
 } __attribute__((packed)) blocks_meta_t;
 int blocks_init(void *block_start,const uint64_t total_size, const uint64_t block_size,blocks_meta_t* blocks );
 

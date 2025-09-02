@@ -1,61 +1,80 @@
+
 #include "block_malloc.h"
 #include "logutil.h"
 /*
 下一步优化点
 
-block_t 结构体中的 id 字段可以考虑去掉，因为它可以通过计算块的起始地址来推导出来，减少内存开销。    
+block_t 结构体中的 id 字段可以考虑去掉，因为它可以通过计算块的起始地址来推导出来，减少内存开销。
 */
 typedef struct
 {
     uint64_t id;
-    uint8_t used;        // 0: free, 1: used
+    uint8_t used;         // 0: free, 1: used
     int64_t free_next_id; // -1,or id;
 } __attribute__((packed)) block_t;
 
+static void spin_lock(_Atomic int64_t *lock)
+{
+    while (atomic_exchange(lock, 1))
+    {
+        // 自旋等待，直到锁被释放
+    }
+}
 
-int blocks_init(void *block_start,const uint64_t total_size, const uint64_t block_size,blocks_meta_t* meta )
+static void spin_unlock(_Atomic int64_t *lock)
+{
+    atomic_store(lock, 0); // 释放锁
+}
+
+int blocks_init(void *block_start, const uint64_t total_size, const uint64_t block_size, blocks_meta_t *meta)
 {
     if (total_size < sizeof(block_t))
     {
         LOG("Total size %zu is too small for blocks_meta_t and block_t structures", total_size);
         return -1;
     }
-    *meta=(blocks_meta_t){
+    *meta = (blocks_meta_t){
         .total_size = total_size,
         .block_size = block_size,
         .total_blocks = 0,
         .used_blocks = 0,
         .free_next_id = -1, // 初始化为 -1，表示没有空闲块，需要新增分配
+        .lock = 0,          // 初始化锁为未锁定状态
         .start = block_start,
     };
     return 0;
 }
 
-void *block_ptr(const blocks_meta_t* meta,const uint64_t id)
+void *block_ptr(const blocks_meta_t *meta, const uint64_t id)
 {
     if (id >= (meta->total_blocks))
     {
         LOG("block id %zu out of range", id);
         return NULL; // Return NULL for invalid id
     }
-    void *ptr =meta->start +(sizeof(block_t) + meta->block_size) * id;
+    void *ptr = meta->start + (sizeof(block_t) + meta->block_size) * id;
     return ptr;
 }
-void *block_data(const blocks_meta_t* meta,const uint64_t id)
+void *block_data(const blocks_meta_t *meta, const uint64_t id)
 {
-    void *ptr =block_ptr(meta,id);
-    if(!ptr) return NULL;
+    void *ptr = block_ptr(meta, id);
+    if (!ptr)
+        return NULL;
     ptr += sizeof(block_t);
     return ptr;
 }
-int64_t block_bydata(const void* blockdata){
-    void *ptr=(void*)blockdata - sizeof(block_t);
-    block_t *block = (block_t *)ptr;
-    if(!block) return -1;
-    return block->id;;
-}
-int64_t blocks_alloc(blocks_meta_t* meta)
+int64_t block_bydata(const void *blockdata)
 {
+    void *ptr = (void *)blockdata - sizeof(block_t);
+    block_t *block = (block_t *)ptr;
+    if (!block)
+        return -1;
+    return block->id;
+    ;
+}
+int64_t blocks_alloc(blocks_meta_t *meta)
+{
+    spin_lock(&meta->lock);
     if (meta->free_next_id == -1)
     {
         uint64_t totalused_size = meta->total_blocks * meta->block_size;
@@ -63,13 +82,14 @@ int64_t blocks_alloc(blocks_meta_t* meta)
         {
             LOG("Out of memory. %zu(totalused_size)= %zu(blocks_meta_t)+ %zu(total_blocks)*%zu(block_size),when total_size %zu",
                 totalused_size, sizeof(blocks_meta_t), meta->total_blocks, meta->block_size, meta->total_size);
+            spin_unlock(&meta->lock);
             return -1;
         }
         else
         {
             meta->total_blocks++;
-            meta->used_blocks++;
 
+            meta->used_blocks++;
             block_t *block = block_ptr(meta, meta->total_blocks - 1);
             *block = (block_t){
                 .id = meta->total_blocks - 1,
@@ -77,30 +97,36 @@ int64_t blocks_alloc(blocks_meta_t* meta)
                 .free_next_id = -1,
             };
 
-            LOG("append new block %zu,meta usage: %zu / %zu",block->id, meta->used_blocks, meta->total_blocks);
+            LOG("append new block %zu,meta usage: %zu / %zu", block->id, meta->used_blocks, meta->total_blocks);
+            spin_unlock(&meta->lock);
             return block->id;
         }
     }
-    uint64_t free_id = meta->free_next_id;
-    block_t *free_block = block_ptr(meta,  meta->free_next_id);
-    meta->free_next_id = free_block->free_next_id;
-    meta->used_blocks++;
+    else
+    {
+        uint64_t free_id = meta->free_next_id;
+        block_t *free_block = block_ptr(meta, meta->free_next_id);
+        meta->free_next_id = free_block->free_next_id;
+        meta->used_blocks++;
 
-    free_block->used = 1;
-    free_block->free_next_id =-1;
+        free_block->used = 1;
+        free_block->free_next_id = -1;
 
-    LOG("Reusing free block %zu, Used meta: %zu/%zu",
-        free_id, meta->used_blocks, meta->total_blocks);
-
-    return free_block->id;
+        LOG("Reusing free block %zu, Used meta: %zu/%zu",
+            free_id, meta->used_blocks, meta->total_blocks);
+        spin_unlock(&meta->lock);
+        return free_block->id;
+    }
 }
 
-void blocks_free(blocks_meta_t *meta,const uint64_t id)
+void blocks_free(blocks_meta_t *meta, const uint64_t id)
 {
+    spin_lock(&meta->lock);
     LOG("block id %zu ->free", id);
     if (id >= meta->total_blocks)
     {
         LOG("block id %zu out of range", id);
+        spin_unlock(&(meta->lock));
         return;
     }
     block_t *free_block = block_ptr(meta, id);
@@ -108,16 +134,17 @@ void blocks_free(blocks_meta_t *meta,const uint64_t id)
     {
     case 0:
         LOG("block id %zu already free", id);
-        return;
+        break;
     case 1:
+        free_block->used = 0;
+        free_block->free_next_id = meta->free_next_id;
+        meta->free_next_id = free_block->id;
+
+        meta->used_blocks--;
         break;
     default:
         LOG("block id %zu status invalid %d", id, free_block->used);
-        return;
+        break;
     }
-    free_block->used = 0;
-    free_block->free_next_id = meta->free_next_id;
-    meta->free_next_id = free_block->id;
-
-    meta->used_blocks--;
+    spin_unlock(&(meta->lock));
 }
