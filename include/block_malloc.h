@@ -6,8 +6,53 @@
 #include <stdatomic.h>
 
 /*
-__attribute__((packed)) 暂时不用
+内存布局图（meta 和 block 区域地址独立）：
+
++-----------------------+   <- meta 区起始地址 (meta_start)
+| blocks_meta_t         |   <- sizeof(blocks_meta_t)
+|-----------------------|
+| total_size            |   uint64_t
+| block_size            |   uint64_t
+| total_blocks          |   uint64_t
+| used_blocks           |   uint64_t
+| free_next_id          |   int64_t
+| lock                  |   _Atomic int64_t
++-----------------------+
+
+
+
+
+
++-----------------------+   <- block 区起始地址 (block_start)
+| block 0              |   <- 每个 block 的大小为 block_size
+|-----------------------|
+| block_t              |   <- sizeof(block_t)
+|   used               |   uint8_t (1 bit)
+|   free_next_id       |   int64_t (63 bits)
+|-----------------------|
+| 用户数据区           |   剩余空间 (block_size - sizeof(block_t))
++-----------------------+
+| block 1              |
+|-----------------------|
+| block_t              |
+|   used               |
+|   free_next_id       |
+|-----------------------|
+| 用户数据区           |
++-----------------------+
+| ...                  |
++-----------------------+
+| block (total_blocks-1)|
+|-----------------------|
+| block_t              |
+|   used               |
+|   free_next_id       |
+|-----------------------|
+| 用户数据区           |
++-----------------------+
+
 */
+
 typedef struct
 {
     uint64_t total_size;   // 总内存大小，不可变
