@@ -8,8 +8,8 @@ block_t 结构体中的 id 字段可以考虑去掉，因为它可以通过计�
 */
 typedef struct
 {
-    uint8_t used:1;         // 0: free, 1: used
-    int64_t free_next_id:63; // -1,or id;
+    uint8_t used : 1;          // 0: free, 1: used
+    int64_t free_next_id : 63; // -1,or id;
 } __attribute__((packed)) block_t;
 
 static void spin_lock(_Atomic int64_t *lock)
@@ -25,11 +25,18 @@ static void spin_unlock(_Atomic int64_t *lock)
     atomic_store(lock, 0); // 释放锁
 }
 
-int blocks_init(blocks_meta_t *meta,const uint64_t total_size, const uint64_t block_size)
+#define BLOCK_SIZE(meta) (sizeof(block_t) + (meta)->block_size)
+
+int blocks_init(blocks_meta_t *meta, const uint64_t total_size, const uint64_t block_size)
 {
-    if (total_size < sizeof(block_t))
+    if (meta == NULL)
     {
-        LOG("Total size %zu is too small for blocks_meta_t and block_t structures", total_size);
+        LOG("[ERROR] meta is NULL");
+        return -1;
+    }
+    if (total_size < sizeof(block_t) + block_size)
+    {
+        LOG("[ERROR] total size %zu is too small for one block_tdata", total_size);
         return -1;
     }
     *meta = (blocks_meta_t){
@@ -42,18 +49,13 @@ int blocks_init(blocks_meta_t *meta,const uint64_t total_size, const uint64_t bl
     };
     return 0;
 }
- 
- int64_t block_offset(const blocks_meta_t *meta, const uint64_t block_id)
+
+int64_t block_offset(const blocks_meta_t *meta, const uint64_t block_id)
 {
-    if (block_id >= (meta->total_blocks))
-    {
-        LOG("block id %zu out of range", block_id);
-        return -1; // Return -1 for invalid id
-    }
-    int64_t offset =   (sizeof(block_t) + meta->block_size) * block_id;
+    int64_t offset =  block_id*BLOCK_SIZE(meta);
     return offset;
 }
- int64_t block_data_offset(const blocks_meta_t *meta, const uint64_t block_id)
+int64_t block_data_offset(const blocks_meta_t *meta, const uint64_t block_id)
 {
     int64_t offset = block_offset(meta, block_id);
     if (offset == -1)
@@ -61,32 +63,41 @@ int blocks_init(blocks_meta_t *meta,const uint64_t total_size, const uint64_t bl
     return offset + sizeof(block_t);
 }
 
- int64_t block_id_byblockoffset(const blocks_meta_t *meta,const uint64_t block_offset)
+int64_t block_id_byblockoffset(const blocks_meta_t *meta, const uint64_t block_offset)
 {
-    uint64_t block_size = meta->block_size + sizeof(block_t);
-    if (block_offset % block_size != 0) {
-        LOG("block_offset %zu is not aligned with block_t size %zu", block_offset, sizeof(block_t));
+    uint64_t block_size = BLOCK_SIZE(meta);
+    if (block_offset % block_size != 0)
+    {
+        // 计算建议的正确偏移量（向下取整到最近的块边界）
+        uint64_t suggested_offset = block_offset - (block_offset % block_size);
+        LOG("[ERROR] block_offset %zu is not aligned with BLOCK_SIZE %zu, suggested offset: %zu",
+            block_offset, block_size, suggested_offset);
         return -1;
     }
     uint64_t block_id = block_offset / block_size;
     return block_id;
 }
 
- int64_t block_id_bydataoffset(const blocks_meta_t *meta, const uint64_t  data_offset)
+int64_t block_id_bydataoffset(const blocks_meta_t *meta, const uint64_t data_offset)
 {
     return block_id_byblockoffset(meta, data_offset - sizeof(block_t));
 }
 
 int64_t blocks_alloc(blocks_meta_t *meta, void *block_start)
 {
+    if (meta == NULL || block_start == NULL)
+    {
+        LOG("[ERROR] meta or block_start is NULL");
+        return -1;
+    }
     spin_lock(&meta->lock);
     if (meta->free_next_id == -1)
     {
-        uint64_t totalused_size = meta->total_blocks * meta->block_size;
-        if (totalused_size + meta->block_size > meta->total_size)
+        uint64_t totalused_size = block_offset(meta,meta->total_blocks);
+        if (totalused_size + BLOCK_SIZE(meta)> meta->total_size)
         {
-            LOG("Out of memory. %zu(totalused_size)= %zu(blocks_meta_t)+ %zu(total_blocks)*%zu(block_size),when total_size %zu",
-                totalused_size, sizeof(blocks_meta_t), meta->total_blocks, meta->block_size, meta->total_size);
+            LOG("[ERROR] Out of memory,%zu(used_size)= %zu(total_blocks)*(sizeof(block_t)=%zu)+%zu(block_size)),when total_size %zu",
+                totalused_size, meta->total_blocks,sizeof(block_t), meta->block_size, meta->total_size);
             spin_unlock(&meta->lock);
             return -1;
         }
@@ -97,13 +108,13 @@ int64_t blocks_alloc(blocks_meta_t *meta, void *block_start)
 
             uint64_t block_id = meta->total_blocks - 1;
             int64_t b_offset = block_offset(meta, block_id);
-            block_t *block = (block_t*)(block_start + b_offset);
+            block_t *block = (block_t *)(block_start + b_offset);
             *block = (block_t){
                 .used = 1,
                 .free_next_id = -1,
             };
 
-            LOG("append new block %zu,meta usage: %zu / %zu", block_id, meta->used_blocks, meta->total_blocks);
+            LOG("[INFO] append block %zu,blocks usage: %zu/%zu", block_id, meta->used_blocks, meta->total_blocks);
             spin_unlock(&meta->lock);
             return block_id;
         }
@@ -112,14 +123,14 @@ int64_t blocks_alloc(blocks_meta_t *meta, void *block_start)
     {
         uint64_t free_id = meta->free_next_id;
         int64_t b_offset = block_offset(meta, free_id);
-        block_t *free_block = (block_t*)(block_start + b_offset);
+        block_t *free_block = (block_t *)(block_start + b_offset);
         meta->free_next_id = free_block->free_next_id;
         meta->used_blocks++;
 
         free_block->used = 1;
         free_block->free_next_id = -1;
 
-        LOG("Reusing free block %zu, Used meta: %zu/%zu",
+        LOG("[INFO] reusing block %zu, blocks usage: %zu/%zu",
             free_id, meta->used_blocks, meta->total_blocks);
         spin_unlock(&meta->lock);
         return free_id;
@@ -128,20 +139,25 @@ int64_t blocks_alloc(blocks_meta_t *meta, void *block_start)
 
 void blocks_free(blocks_meta_t *meta, void *block_start, const uint64_t block_id)
 {
+    if (meta == NULL || block_start == NULL)
+    {
+        LOG("[ERROR] meta or block_start must not NULL");
+        return;
+    }
     spin_lock(&meta->lock);
     if (block_id >= meta->total_blocks)
     {
-        LOG("block id %zu out of range", block_id);
+        LOG("[ERROR] block id %zu out of range", block_id);
         spin_unlock(&(meta->lock));
         return;
     }
     int64_t b_offset = block_offset(meta, block_id);
-    block_t *free_block = (block_t*)(block_start + b_offset);
+    block_t *free_block = (block_t *)(block_start + b_offset);
 
     switch (free_block->used)
     {
     case 0:
-        LOG("block id %zu already free", block_id);
+        LOG("[WARN] block id %zu already free", block_id);
         break;
     case 1:
         free_block->used = 0;
@@ -151,9 +167,9 @@ void blocks_free(blocks_meta_t *meta, void *block_start, const uint64_t block_id
         meta->used_blocks--;
         break;
     default:
-        LOG("block id %zu status invalid %d", block_id, free_block->used);
+        LOG("[WARN] block id %zu status invalid %d,who make this?", block_id, free_block->used);
         break;
     }
-    LOG("block id %zu ->free", block_id);
+    LOG("[INFO] block id %zu freed", block_id);
     spin_unlock(&(meta->lock));
 }
