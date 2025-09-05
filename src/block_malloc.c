@@ -96,7 +96,7 @@ int64_t blocks_alloc(blocks_meta_t *meta, void *block_start)
         uint64_t totalused_size = block_offset(meta,meta->total_blocks);
         if (totalused_size + BLOCK_SIZE(meta)> meta->total_size)
         {
-            LOG("[ERROR] Out of memory,%zu(used_size)= %zu(total_blocks)*(sizeof(block_t)=%zu)+%zu(block_size)),when total_size %zu",
+            LOG("[ERROR] out of memory,%zu(used_size)= %zu(total_blocks)*(sizeof(block_t)=%zu)+%zu(block_size)),when total_size %zu",
                 totalused_size, meta->total_blocks,sizeof(block_t), meta->block_size, meta->total_size);
             spin_unlock(&meta->lock);
             return -1;
