@@ -92,7 +92,7 @@ int64_t block_offset(const blocks_meta_t *meta, const uint64_t block_id);
  * 辅助计算函数
  * 计算对应块id的data起始地址，相对block_start的bytes偏移量
  */
-int64_t block_data_offset(const blocks_meta_t *meta, const uint64_t block_id);
+int64_t blockdata_offset(const blocks_meta_t *meta, const uint64_t block_id);
 
 /*
  * 辅助计算函数

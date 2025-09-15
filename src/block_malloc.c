@@ -130,7 +130,7 @@ int64_t block_offset(const blocks_meta_t *meta, const uint64_t block_id)
     int64_t offset = block_id *BLOCK_SIZE(meta);
     return offset;
 }
-int64_t block_data_offset(const blocks_meta_t *meta, const uint64_t block_id)
+int64_t blockdata_offset(const blocks_meta_t *meta, const uint64_t block_id)
 {
     int64_t offset = block_offset(meta, block_id);
     if (offset == -1)
