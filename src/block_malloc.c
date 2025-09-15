@@ -138,7 +138,7 @@ int64_t block_data_offset(const blocks_meta_t *meta, const uint64_t block_id)
     return offset +meta->sizeof_block_head;
 }
 
-int64_t block_id_byblockoffset(const blocks_meta_t *meta, const uint64_t block_offset)
+int64_t blockid_byblockoffset(const blocks_meta_t *meta, const uint64_t block_offset)
 {
     uint64_t block_size = BLOCK_SIZE(meta);
     if (block_offset % block_size != 0)
@@ -153,9 +153,9 @@ int64_t block_id_byblockoffset(const blocks_meta_t *meta, const uint64_t block_o
     return block_id;
 }
 
-int64_t block_id_bydataoffset(const blocks_meta_t *meta, const uint64_t data_offset)
+int64_t blockid_bydataoffset(const blocks_meta_t *meta, const uint64_t data_offset)
 {
-    return block_id_byblockoffset(meta, data_offset - meta->sizeof_block_head);
+    return blockid_byblockoffset(meta, data_offset - meta->sizeof_block_head);
 }
 
 int64_t blocks_alloc(blocks_meta_t *meta, void *block_start)

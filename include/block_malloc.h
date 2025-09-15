@@ -98,12 +98,12 @@ int64_t block_data_offset(const blocks_meta_t *meta, const uint64_t block_id);
  * 辅助计算函数
  * 从block相对block_start的bytes偏移量，计算对应块id
  */
-int64_t block_id_byblockoffset(const blocks_meta_t *meta, const uint64_t block_offset);
+int64_t blockid_byblockoffset(const blocks_meta_t *meta, const uint64_t block_offset);
 
 /*
  * 辅助计算函数
  * 从blockdata相对block_start的bytes偏移量，计算对应块id
  */
-int64_t block_id_bydataoffset(const blocks_meta_t *meta, const uint64_t data_offset);
+int64_t blockid_bydataoffset(const blocks_meta_t *meta, const uint64_t data_offset);
 
 #endif // BLOCK_MALLOC_H
