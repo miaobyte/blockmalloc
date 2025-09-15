@@ -1,17 +1,11 @@
 /*
 block_malloc 是一个专为管理固定大小的内存块（blocks）而设计的内存分配器。
 它模拟了简单的内存池机制，支持高效的分配和释放操作，支持线程安全，保持api简洁性
-*/
 
-#ifndef BLOCK_MALLOC_H
-#define BLOCK_MALLOC_H
 
-#include <stddef.h>
-#include <stdint.h>
-#include <stdatomic.h>
-
-/*
 内存布局图（meta 和 block 区域地址独立）：
+
+meta区:
 
 +-----------------------+   <- meta 区起始地址 (meta_start)
 | blocks_meta_t         |   <- sizeof(blocks_meta_t)
@@ -21,51 +15,51 @@ block_malloc 是一个专为管理固定大小的内存块（blocks）而设计�
 | total_blocks          |   uint64_t
 | used_blocks           |   uint64_t
 | free_next_id          |   int64_t
-| lock                  |   _Atomic int64_t
+| lock                  |   _Atomic int8_t
 +-----------------------+
 
 
+block区:
+block_head_t的大小有2种
+32位模式:减少block_head的内存占用为4字节
+64位模式:block_head内存占用为8字节
 
-
-
-+-----------------------+   <- block 区起始地址 (block_start)
-| block 0              |   <- 每个 block 的大小为 block_size
-|-----------------------|
-| block_t              |   <- sizeof(block_t)
++----------------------+   <- block 区起始地址 (block_start)
+| block0_head           |   
 |   used               |   uint8_t (1 bit)
-|   free_next_id       |   int64_t (63 bits)
-|-----------------------|
-| 用户数据区           |   剩余空间 (block_size - sizeof(block_t))
-+-----------------------+
-| block 1              |
-|-----------------------|
+|   free_next_id       |   int32_t(31 bits) or int64_t(63 bits)
+| block0_data          |   剩余空间 (block_size - sizeof(block_t))
++----------------------+
 | block_t              |
 |   used               |
 |   free_next_id       |
-|-----------------------|
-| 用户数据区           |
-+-----------------------+
-| ...                  |
-+-----------------------+
-| block (total_blocks-1)|
-|-----------------------|
-| block_t              |
+| block1_data          |
++----------------------+
+| blockn_t              |
 |   used               |
 |   free_next_id       |
-|-----------------------|
-| 用户数据区           |
-+-----------------------+
+| blockn_data          |
++----------------------+
 
 */
 
+
+#ifndef BLOCK_MALLOC_H
+#define BLOCK_MALLOC_H
+
+#include <stddef.h>
+#include <stdint.h>
+#include <stdatomic.h>
+
 typedef struct
 {
-    uint64_t total_size;   // 总内存大小，不可变
+    uint64_t total_size;   // 总内存大小
     uint64_t block_size;   // 每个块的大小
-    uint64_t total_blocks; // 总块数
+    uint8_t sizeof_block_head:4; // 块头大小，1-8字节
+    uint64_t malloc_blocks:60; // 总申请的块数
     uint64_t used_blocks;  // 已使用的块数
     int64_t free_next_id;  // 首个空闲块的id,if no free block, this is -1;
-    _Atomic int64_t lock;  // 原子锁，用于多线程同步
+    _Atomic int8_t lock;  // 原子锁，用于多线程同步
 } blocks_meta_t;
 
 /**
