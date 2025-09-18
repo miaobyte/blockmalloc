@@ -59,7 +59,7 @@ typedef struct
     uint64_t malloc_blocks:60; // 总申请的块数
     uint64_t used_blocks;  // 已使用的块数
     int64_t free_next_id;  // 首个空闲块的id,if no free block, this is -1;
-    _Atomic int8_t lock;  // 原子锁，用于多线程同步
+    _Atomic int64_t lock;  // 原子锁，用于多线程同步
 } blocks_meta_t;
 
 /**

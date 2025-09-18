@@ -86,7 +86,7 @@ static block64_t getblock_t(const blocks_meta_t *meta, void *block_ptr)
 
 #define BLOCK_SIZE(meta) (meta->sizeof_block_head + meta->block_size)
 
-static void spin_lock(_Atomic int8_t *lock)
+static void spin_lock(_Atomic int64_t *lock)
 {
     while (atomic_exchange(lock, 1))
     {
@@ -94,7 +94,7 @@ static void spin_lock(_Atomic int8_t *lock)
     }
 }
 
-static void spin_unlock(_Atomic int8_t *lock)
+static void spin_unlock(_Atomic int64_t *lock)
 {
     atomic_store(lock, 0); // 释放锁
 }
