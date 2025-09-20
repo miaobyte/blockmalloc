@@ -23,7 +23,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 # 安装目标和头文件
-install(TARGETS block_malloc DESTINATION lib/block_malloc)
-install(DIRECTORY include/ DESTINATION include/block_malloc)
+install(TARGETS block_malloc DESTINATION lib)
+install(DIRECTORY include/ DESTINATION include)
 
 add_subdirectory(test)

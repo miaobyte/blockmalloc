@@ -1,6 +1,6 @@
 #include <limits.h> // for INT8_MAX, INT16_MAX, INT32_MAX
 
-#include "block_malloc.h"
+#include "block_malloc/block_malloc.h"
 #include "logutil.h"
 
 #ifdef _MSC_VER
