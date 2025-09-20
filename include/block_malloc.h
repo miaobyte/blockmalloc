@@ -49,7 +49,8 @@ block_head_t的大小有2种
 
 #include <stddef.h>
 #include <stdint.h>
-#include <stdatomic.h>
+
+#include "spinlock.h"
 
 typedef struct
 {
@@ -59,7 +60,7 @@ typedef struct
     uint64_t malloc_blocks:60; // 总申请的块数
     uint64_t used_blocks;  // 已使用的块数
     int64_t free_next_id;  // 首个空闲块的id,if no free block, this is -1;
-    _Atomic int64_t lock;  // 原子锁，用于多线程同步
+    spinlock_t lock;  // 原子锁，用于多线程同步
 } blocks_meta_t;
 
 /**

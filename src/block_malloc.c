@@ -3,21 +3,46 @@
 #include "block_malloc.h"
 #include "logutil.h"
 
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
+
 typedef struct
 {
-    uint8_t used : 1;          // 0: free, 1: used
-    int16_t free_next_id : 15; // -1,or uint14_t id
-} __attribute__((packed)) block16_t;
+    uint8_t used : 1;
+    uint8_t has_next_free : 1;
+    uint16_t next_free_id : 14;
+}
+#ifdef __GNUC__
+__attribute__((packed))
+#endif
+block16_t;
+
 typedef struct
 {
-    uint8_t used : 1;          // 0: free, 1: used
-    int32_t free_next_id : 31; // -1,or uint30_t id
-} __attribute__((packed)) block32_t;
+    uint8_t used : 1;
+    uint8_t has_next_free : 1;
+    uint32_t next_free_id : 30;
+}
+#ifdef __GNUC__
+__attribute__((packed))
+#endif
+block32_t;
+
 typedef struct
 {
-    uint8_t used : 1;          // 0: free, 1: used
-    int64_t free_next_id : 63; // -1,or uint62_t id
-} __attribute__((packed)) block64_t;
+    uint8_t used : 1;
+    uint8_t has_next_free : 1;
+    uint64_t next_free_id : 62;
+}
+#ifdef __GNUC__
+__attribute__((packed))
+#endif
+block64_t;
+
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
 
 static void setblock_t(const blocks_meta_t *meta, void *block_ptr, uint8_t used, int64_t free_next_id)
 {
@@ -26,30 +51,31 @@ static void setblock_t(const blocks_meta_t *meta, void *block_ptr, uint8_t used,
     case 2:
     {
         block16_t *block = (block16_t *)block_ptr;
-        *block = (block16_t){
-            .used = used,
-            .free_next_id = free_next_id,
-        };
+        block->used = used;
+        block->has_next_free = (free_next_id != -1) ? 1 : 0;
+        block->next_free_id = (free_next_id != -1) ? (uint16_t)free_next_id : 0;
         break;
     }
     case 4:
     {
         block32_t *block = (block32_t *)block_ptr;
-        *block = (block32_t){
-            .used = used,
-            .free_next_id = free_next_id,
-        };
+       block->used = used;
+        block->has_next_free = (free_next_id != -1) ? 1 : 0;
+        block->next_free_id = (free_next_id != -1) ? (uint32_t)free_next_id : 0;
         break;
     }
     case 8:
     {
         block64_t *block = (block64_t *)block_ptr;
-        *block = (block64_t){
-            .used = used,
-            .free_next_id = free_next_id,
-        };
+       block->used = used;
+        block->has_next_free = (free_next_id != -1) ? 1 : 0;
+        block->next_free_id = (free_next_id != -1) ? (uint64_t)free_next_id : 0;
         break;
     }
+    default:
+        LOG("[ERROR] Invalid sizeof_block_head: %d, returning default block", meta->sizeof_block_head);
+        // result 已初始化为 0，无需额外操作
+        break;
     }
 }
 
@@ -62,7 +88,8 @@ static block64_t getblock_t(const blocks_meta_t *meta, void *block_ptr)
         block16_t *block = (block16_t *)block_ptr;
         return (block64_t){
             .used = block->used,
-            .free_next_id = block->free_next_id,
+            .has_next_free = block->has_next_free,
+            .next_free_id = block->next_free_id,
         };
     }
     case 4:
@@ -70,7 +97,8 @@ static block64_t getblock_t(const blocks_meta_t *meta, void *block_ptr)
         block32_t *block = (block32_t *)block_ptr;
         return (block64_t){
             .used = block->used,
-            .free_next_id = block->free_next_id,
+            .has_next_free = block->has_next_free,
+            .next_free_id = block->next_free_id,
         };
     }
     case 8:
@@ -78,26 +106,19 @@ static block64_t getblock_t(const blocks_meta_t *meta, void *block_ptr)
         block64_t *block = (block64_t *)block_ptr;
         return (block64_t){
             .used = block->used,
-            .free_next_id = block->free_next_id,
+            .has_next_free = block->has_next_free,
+            .next_free_id = block->next_free_id,
         };
     }
+    default:
+        // 处理无效 sizeof_block_head（例如，数据损坏）
+        LOG("[ERROR] Invalid sizeof_block_head: %d, returning default block", meta->sizeof_block_head);
+        // result 已初始化为 0，无需额外操作
+        return (block64_t){0};
     }
 }
 
 #define BLOCK_SIZE(meta) (meta->sizeof_block_head + meta->block_size)
-
-static void spin_lock(_Atomic int64_t *lock)
-{
-    while (atomic_exchange(lock, 1))
-    {
-        // 自旋等待，直到锁被释放
-    }
-}
-
-static void spin_unlock(_Atomic int64_t *lock)
-{
-    atomic_store(lock, 0); // 释放锁
-}
 
 int blocks_init(blocks_meta_t *meta, const uint64_t total_size, const uint64_t block_size)
 {
@@ -120,22 +141,20 @@ int blocks_init(blocks_meta_t *meta, const uint64_t total_size, const uint64_t b
         meta->sizeof_block_head = 2; // int16_t
     else if (max_blocks <= INT32_MAX / 4)
         meta->sizeof_block_head = 4; // int32_t
-    else 
+    else
         meta->sizeof_block_head = 8; // int64_t
     return 0;
 }
 
 int64_t block_offset(const blocks_meta_t *meta, const uint64_t block_id)
 {
-    int64_t offset = block_id *BLOCK_SIZE(meta);
+    int64_t offset = block_id * BLOCK_SIZE(meta);
     return offset;
 }
 int64_t blockdata_offset(const blocks_meta_t *meta, const uint64_t block_id)
 {
     int64_t offset = block_offset(meta, block_id);
-    if (offset == -1)
-        return -1;
-    return offset +meta->sizeof_block_head;
+    return offset + meta->sizeof_block_head;
 }
 
 int64_t blockid_byblockoffset(const blocks_meta_t *meta, const uint64_t block_offset)
@@ -172,7 +191,7 @@ int64_t blocks_alloc(blocks_meta_t *meta, void *block_start)
         if (totalused_size + BLOCK_SIZE(meta) > meta->total_size)
         {
             LOG("[ERROR] out of memory,%zu(used_size)= %zu(malloc_blocks)*(sizeof(block_head)=%d)+%zu(block_size)),when total_size %zu",
-                totalused_size, (uint64_t)(meta->malloc_blocks),  (uint8_t)(meta->sizeof_block_head), meta->block_size, meta->total_size);
+                totalused_size, (uint64_t)(meta->malloc_blocks), (uint8_t)(meta->sizeof_block_head), meta->block_size, meta->total_size);
             spin_unlock(&meta->lock);
             return -1;
         }
@@ -183,7 +202,7 @@ int64_t blocks_alloc(blocks_meta_t *meta, void *block_start)
 
             uint64_t block_id = meta->malloc_blocks - 1;
             int64_t b_offset = block_offset(meta, block_id);
-            setblock_t(meta, block_start + b_offset, 1, -1);
+            setblock_t(meta, (uint8_t *)block_start + b_offset, 1, -1);
             LOG("[INFO] append block %zu,blocks usage: %zu/%zu", block_id, (uint64_t)(meta->used_blocks), (uint64_t)(meta->malloc_blocks));
             spin_unlock(&meta->lock);
             return block_id;
@@ -193,10 +212,10 @@ int64_t blocks_alloc(blocks_meta_t *meta, void *block_start)
     {
         uint64_t free_id = meta->free_next_id;
         int64_t b_offset = block_offset(meta, free_id);
-        block64_t free_block = getblock_t(meta,block_start + b_offset);
-        meta->free_next_id = free_block.free_next_id;
+        block64_t free_block = getblock_t(meta, (uint8_t *)block_start + b_offset);
+        meta->free_next_id = free_block.next_free_id;
         meta->used_blocks++;
-        setblock_t(meta,block_start + b_offset,1,-1);
+        setblock_t(meta, (uint8_t *)block_start + b_offset, 1, -1);
 
         LOG("[INFO] reusing block %zu, blocks usage: %zu/%zu",
             free_id, (uint64_t)(meta->used_blocks), (uint64_t)(meta->malloc_blocks));
@@ -220,7 +239,7 @@ void blocks_free(blocks_meta_t *meta, void *block_start, const uint64_t block_id
         return;
     }
     int64_t b_offset = block_offset(meta, block_id);
-    block64_t free_block = getblock_t(meta,block_start + b_offset);
+    block64_t free_block = getblock_t(meta, (uint8_t *)block_start + b_offset);
 
     switch (free_block.used)
     {
@@ -228,7 +247,7 @@ void blocks_free(blocks_meta_t *meta, void *block_start, const uint64_t block_id
         LOG("[WARN] block id %zu already free", block_id);
         break;
     case 1:
-        setblock_t(meta,block_start + b_offset,0,meta->free_next_id);
+        setblock_t(meta, (uint8_t *)block_start + b_offset, 0, meta->free_next_id);
         meta->free_next_id = block_id;
         meta->used_blocks--;
         break;
