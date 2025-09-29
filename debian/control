@@ -2,7 +2,7 @@ Source: block-malloc
 Section: libs
 Priority: optional
 Maintainer: miaobyte <peng.li24@nio.com>
-Build-Depends: debhelper (>= 12), cmake, pkg-config, build-essential
+Build-Depends: debhelper (>= 12), cmake, build-essential
 Standards-Version: 4.5.0
 Homepage: https://github.com/miaobyte/block_malloc
 

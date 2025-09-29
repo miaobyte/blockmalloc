@@ -1,5 +1,8 @@
-# development package: headers and unversioned linker symlink
+# development package: headers, unversioned linker symlink, cmake config
 usr/include/block_malloc/*
 # unversioned linker symlink (created by CMake)
 usr/lib/x86_64-linux-gnu/libblock_malloc.so
 usr/lib/*/libblock_malloc.so
+# cmake config installed to versioned subdir (match any version)
+usr/lib/x86_64-linux-gnu/cmake/block_malloc-*/*
+usr/lib/*/cmake/block_malloc-*/*

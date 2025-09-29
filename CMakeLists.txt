@@ -31,10 +31,35 @@ endif()
 
 # 安装库与头文件
 install(TARGETS block_malloc
+    EXPORT block_mallocTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# Export targets and generate CMake config package and pkg-config
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/block_mallocConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+configure_file(
+    "${CMAKE_CURRENT_LIST_DIR}/cmake/BlockMallocConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/block_mallocConfig.cmake"
+    @ONLY
+)
+
+install(EXPORT block_mallocTargets
+    FILE block_mallocTargets.cmake
+    NAMESPACE block_malloc::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/block_malloc-${PROJECT_VERSION}
+)
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/block_mallocConfig.cmake"
+              "${CMAKE_CURRENT_BINARY_DIR}/block_mallocConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/block_malloc-${PROJECT_VERSION})
 
 # 测试
 enable_testing()
