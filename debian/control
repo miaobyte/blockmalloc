@@ -1,0 +1,21 @@
+Source: block-malloc
+Section: libs
+Priority: optional
+Maintainer: miaobyte <peng.li24@nio.com>
+Build-Depends: debhelper (>= 12), cmake, pkg-config, build-essential
+Standards-Version: 4.5.0
+Homepage: https://github.com/miaobyte/block_malloc
+
+Package: libblock-malloc2
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: small fixed-block memory allocator library
+ A compact shared library that provides a fixed-size block allocator API (block_malloc).
+ Runtime library package (shared object and runtime files).
+
+Package: libblock-malloc2-dev
+Section: libdevel
+Architecture: any
+Depends: libblock-malloc2 (= ${binary:Version}), ${misc:Depends}
+Description: development files for block-malloc
+ Header files and unversioned symlink for developing and linking against libblock-malloc2.

@@ -1,7 +1,18 @@
 
-#
+#build
 build
 
 #ide
 .vscode
 .idea
+
+#install
+obj-x86_64*
+debian/.debhelper
+debian/tmp/
+debian/deb*
+debian/libblock-malloc2
+debian/libblock-malloc2-dev
+*.log
+*.substvars
+debian/files*
