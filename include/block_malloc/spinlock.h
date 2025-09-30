@@ -3,20 +3,25 @@
 
 #include <stdint.h>
 
-// 条件编译：MSVC 使用 Windows 原子操作，否则使用 C11 _Atomic
-#ifdef _MSC_VER
-#include <windows.h>  // for InterlockedExchange64
-typedef volatile LONG64 spinlock_t;  // 使用 Windows 的 LONG64（64-bit 原子类型）
-#define SPINLOCK_EXCHANGE(ptr, val) InterlockedExchange64((ptr), (val))
-#define SPINLOCK_STORE(ptr, val) InterlockedExchange64((ptr), (val))  // 简化实现，实际为交换
+#if defined(__x86_64__) || defined(__i386__)
+#define SPINLOCK_CPU_RELAX() __asm__ __volatile__("pause" ::: "memory")
+#elif defined(__aarch64__) || defined(__arm__)
+#define SPINLOCK_CPU_RELAX() __asm__ __volatile__("yield" ::: "memory")
 #else
-#include <stdatomic.h>
-typedef _Atomic int64_t spinlock_t;
-#define SPINLOCK_EXCHANGE(ptr, val) atomic_exchange((ptr), (val))
-#define SPINLOCK_STORE(ptr, val) atomic_store((ptr), (val))
+#define SPINLOCK_CPU_RELAX() ((void)0)
 #endif
 
-// 自旋锁函数声明
+#ifdef _MSC_VER
+#include <windows.h>
+typedef volatile LONG64 spinlock_t;
+#define SPINLOCK_EXCHANGE(ptr, val) InterlockedExchange64((ptr), (val))
+#define SPINLOCK_STORE(ptr, val) InterlockedExchange64((ptr), (val))
+#else
+typedef volatile int64_t spinlock_t;
+#define SPINLOCK_EXCHANGE(ptr, val) __atomic_exchange_n((ptr), (val), __ATOMIC_ACQ_REL)
+#define SPINLOCK_STORE(ptr, val) __atomic_store_n((ptr), (val), __ATOMIC_RELEASE)
+#endif
+
 void spin_lock(spinlock_t *lock);
 void spin_unlock(spinlock_t *lock);
 

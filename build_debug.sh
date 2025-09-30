@@ -9,4 +9,4 @@ cmake -DCMAKE_BUILD_TYPE=Debug ..
 # 构建
 make
 
-make install
+# make install
