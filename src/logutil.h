@@ -1,13 +1,16 @@
 #ifndef LOGUTIL_H
 #define LOGUTIL_H
 
-#include <stdio.h>
-
-// 如果 ENABLE_LOG 被定义，则启用日志打印，否则禁用
+// 不再直接依赖 <stdio.h>；用户可在裸机实现 PLATFORM_LOG(fmt, ...)
 #ifdef ENABLE_LOG
-    #define LOG(fmt, ...) printf("[BLOCK_MALLOC]" fmt "\n", ##__VA_ARGS__)
+    #ifdef PLATFORM_LOG
+        #define LOG(fmt, ...) PLATFORM_LOG("[BLOCK_MALLOC] " fmt, ##__VA_ARGS__)
+    #else
+        // 默认不做任何输出；在裸机平台实现 PLATFORM_LOG 来启用输出（例如通过 UART）
+        #define LOG(fmt, ...) ((void)0)
+    #endif
 #else
-    #define LOG(fmt, ...) // 禁用日志打印
+    #define LOG(fmt, ...) ((void)0)
 #endif
 
 #endif // LOGUTIL_H

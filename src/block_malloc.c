@@ -1,5 +1,3 @@
-#include <limits.h> // for INT8_MAX, INT16_MAX, INT32_MAX
-
 #include "block_malloc/block_malloc.h"
 #include "logutil.h"
 
@@ -137,9 +135,9 @@ int blocks_init(blocks_meta_t *meta, const uint64_t total_size, const uint64_t b
     };
     uint64_t min_header_size = 2; // 假设最小 2 字节 (int16_t)
     uint64_t max_blocks = meta->total_size / (min_header_size + meta->block_size);
-    if (max_blocks <= INT16_MAX / 4)
+    if (max_blocks <= (32767ULL / 4ULL))
         meta->sizeof_block_head = 2; // int16_t
-    else if (max_blocks <= INT32_MAX / 4)
+    else if (max_blocks <= (2147483647ULL / 4ULL))
         meta->sizeof_block_head = 4; // int32_t
     else
         meta->sizeof_block_head = 8; // int64_t
