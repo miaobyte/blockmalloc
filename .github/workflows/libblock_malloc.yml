@@ -79,17 +79,6 @@ jobs:
     - name: 构建
       # 使用给定配置构建程序。请注意，--config 是必需的，因为默认的 Windows 生成器是多配置生成器（Visual Studio 生成器）。
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
-    
-    - name: 打印目录结构
-      shell: bash
-      run: |
-        echo "=== Build Directory Structure ==="
-        ls -la ${{ steps.strings.outputs.build-output-dir }}  # 列出构建目录文件
-        echo "=== Recursive Structure ==="
-        find ${{ steps.strings.outputs.build-output-dir }} -type f | head -20  # 递归列出前20个文件，避免输出过多
-        echo "=== Library Files ==="
-        find ${{ steps.strings.outputs.build-output-dir }} -name "*.lib" -o -name "*.dll" -o -name "*.so" -o -name "*.a"  # 查找库文件
-
 
     - name: 测试
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
