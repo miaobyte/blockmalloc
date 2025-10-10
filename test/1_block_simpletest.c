@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "block_malloc/block_malloc.h"
+#include "blockmalloc/blockmalloc.h"
 
 void test_free(blocks_meta_t *blocks, void* block_start) {
     int64_t block_id = blocks_alloc(blocks, block_start);

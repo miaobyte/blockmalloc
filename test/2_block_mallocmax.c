@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "block_malloc/block_malloc.h"
+#include "blockmalloc/blockmalloc.h"
 
 void test_alloc(blocks_meta_t *blocks, void *block_start) {
     for (size_t i = 0; i < 1000; i++) {

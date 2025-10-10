@@ -1,5 +1,5 @@
 /*
-block_malloc 是一个专为管理固定大小的内存块（blocks）而设计的内存分配器。
+blockmalloc 是一个专为管理固定大小的内存块（blocks）而设计的内存分配器。
 它模拟了简单的内存池机制，支持高效的分配和释放操作，支持线程安全，保持api简洁性
 
 
@@ -44,8 +44,8 @@ block_head_t的大小有2种
 */
 
 
-#ifndef BLOCK_MALLOC_H
-#define BLOCK_MALLOC_H
+#ifndef blockmalloc_H
+#define blockmalloc_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -107,4 +107,4 @@ int64_t blockid_byblockoffset(const blocks_meta_t *meta, const uint64_t block_of
  */
 int64_t blockid_bydataoffset(const blocks_meta_t *meta, const uint64_t data_offset);
 
-#endif // BLOCK_MALLOC_H
+#endif // blockmalloc_H

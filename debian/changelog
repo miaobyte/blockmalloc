@@ -1,4 +1,4 @@
-block-malloc (0.1.0-1) unstable; urgency=medium
+blockmalloc (0.1.0-1) unstable; urgency=medium
 
   * Initial release.
 

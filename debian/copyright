@@ -1,6 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: block_malloc
-Source: https://github.com/miaobyte/block_malloc
+Upstream-Name: blockmalloc
+Source: https://github.com/miaobyte/blockmalloc
 
 Files: *
 Copyright: 2024-2025 Miaobyte <peng.li24@nio.com>
