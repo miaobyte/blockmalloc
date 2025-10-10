@@ -12,10 +12,11 @@ void test_alloc(blocks_meta_t *blocks, void *block_start) {
     }
 }
 
-void main() {
+int main() {
     uint64_t totalsize=1024 * 4;
     uint8_t *pool=malloc(totalsize);
     blocks_meta_t blocks;
     blocks_init(&blocks,totalsize, 64);
     test_alloc(&blocks, pool);
+    return 0;
 }
