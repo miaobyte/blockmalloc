@@ -11,8 +11,8 @@ obj-x86_64*
 debian/.debhelper
 debian/tmp/
 debian/deb*
-debian/libblockmalloc2
-debian/libblockmalloc2-dev
+debian/libblockmalloc1/
+debian/libblockmalloc1-dev/
 *.log
 *.substvars
 debian/files*
