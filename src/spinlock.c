@@ -1,4 +1,4 @@
-#include "blockmalloc/spinlock.h"
+#include <blockmalloc/spinlock.h>
 
 #if defined(_MSC_VER)
 #include <windows.h>
@@ -18,27 +18,28 @@ static inline void cpu_relax(void) { (void)0; }
 
 /* atomic exchange / store helpers (platform specific) */
 #ifdef _MSC_VER
-static inline LONG64 spin_atomic_exchange(spinlock_t *ptr, LONG64 val)
+static inline int64_t spin_atomic_exchange(int64_t *ptr, int64_t val)
 {
-    return InterlockedExchange64((volatile LONG64 *)ptr, val);
+    /* InterlockedExchange64 works with LONG64; cast to/from int64_t */
+    return (int64_t)InterlockedExchange64((volatile LONG64 *)ptr, (LONG64)val);
 }
-static inline void spin_atomic_store(spinlock_t *ptr, LONG64 val)
+static inline void spin_atomic_store(int64_t *ptr, int64_t val)
 {
     /* Use InterlockedExchange64 as a store (returns previous, ignore it) */
-    InterlockedExchange64((volatile LONG64 *)ptr, val);
+    InterlockedExchange64((volatile LONG64 *)ptr, (LONG64)val);
 }
 #else
-static inline int64_t spin_atomic_exchange(spinlock_t *ptr, int64_t val)
+static inline int64_t spin_atomic_exchange(int64_t *ptr, int64_t val)
 {
     return __atomic_exchange_n((int64_t *)ptr, val, __ATOMIC_ACQ_REL);
 }
-static inline void spin_atomic_store(spinlock_t *ptr, int64_t val)
+static inline void spin_atomic_store(int64_t *ptr, int64_t val)
 {
     __atomic_store_n((int64_t *)ptr, val, __ATOMIC_RELEASE);
 }
 #endif
 
-void spin_lock(spinlock_t *lock)
+void spin_lock(int64_t *lock)
 {
     while (spin_atomic_exchange(lock, 1))
     {
@@ -46,7 +47,7 @@ void spin_lock(spinlock_t *lock)
     }
 }
 
-void spin_unlock(spinlock_t *lock)
+void spin_unlock(int64_t *lock)
 {
     spin_atomic_store(lock, 0);
 }
