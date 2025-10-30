@@ -1,5 +1,6 @@
 #include "blockmalloc/blockmalloc.h"
 #include "logutil.h"
+#include "blockmalloc/spinlock.h"
 
 #ifdef _MSC_VER
 #pragma pack(push, 1)
